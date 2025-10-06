@@ -195,7 +195,7 @@
 
       // 단어 복사
       const copyWord = (word) => {
-        const text = `${word.english} - ${word.korean}${word.pronunciation ? ' (' + word.pronunciation + ')' : ''}${word.example ? '\n예문: ' + word.example : ''}`;
+        const text = word.english;
 
         navigator.clipboard.writeText(text).then(() => {
           alert('📋 복사되었습니다!');
