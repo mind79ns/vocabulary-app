@@ -772,6 +772,7 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                               type="text"
                               value={newWord.english}
                               onChange={(e) => setNewWord({...newWord, english: e.target.value})}
+                              onKeyPress={(e) => e.key === 'Enter' && !isTranslating && newWord.english.trim() && translateWord()}
                               className="flex-1 px-4 py-2 border rounded-lg"
                               placeholder="예: ephemeral"
                             />
@@ -804,6 +805,7 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                               type="text"
                               value={newWord.korean}
                               onChange={(e) => setNewWord({...newWord, korean: e.target.value})}
+                              onKeyPress={(e) => e.key === 'Enter' && !isTranslating && newWord.korean.trim() && translateWord()}
                               className="flex-1 px-4 py-2 border rounded-lg"
                               placeholder="예: 일시적인, 덧없는"
                             />
