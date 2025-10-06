@@ -78,6 +78,9 @@
       const [recommendations, setRecommendations] = useState([]);
       const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
+      // 검색
+      const [searchQuery, setSearchQuery] = useState('');
+
       // LocalStorage 자동 저장
       useEffect(() => {
         try {
@@ -646,7 +649,18 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
               {/* 단어 목록 */}
               {currentPage === 'list' && (
                 <div>
-                  <h2 className="text-2xl font-bold mb-4">📚 단어 목록</h2>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl font-bold">📚 단어 목록</h2>
+                    {words.length > 0 && (
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="🔍 영어 또는 한글로 검색..."
+                        className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none w-80"
+                      />
+                    )}
+                  </div>
                   {words.length === 0 ? (
                     <div className="text-center py-12 text-gray-400">
                       <p className="text-6xl mb-4">📖</p>
@@ -655,7 +669,16 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {words.map(word => (
+                      {words
+                        .filter(word => {
+                          if (!searchQuery.trim()) return true;
+                          const query = searchQuery.toLowerCase();
+                          return (
+                            word.english.toLowerCase().includes(query) ||
+                            word.korean.toLowerCase().includes(query)
+                          );
+                        })
+                        .map(word => (
                         <div key={word.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
