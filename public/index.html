@@ -193,6 +193,24 @@
         }
       };
 
+      // 단어 복사
+      const copyWord = (word) => {
+        const text = `${word.english} - ${word.korean}${word.pronunciation ? ' (' + word.pronunciation + ')' : ''}${word.example ? '\n예문: ' + word.example : ''}`;
+
+        navigator.clipboard.writeText(text).then(() => {
+          alert('📋 복사되었습니다!');
+        }).catch(() => {
+          // 클립보드 실패 시 fallback
+          const textArea = document.createElement('textarea');
+          textArea.value = text;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          alert('📋 복사되었습니다!');
+        });
+      };
+
       // 단어 삭제
       const deleteWord = (id) => {
         if (confirm('정말 삭제하시겠습니까?')) {
@@ -647,12 +665,22 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                               {word.pronunciation && <p className="text-sm text-gray-500 mb-2">🔊 {word.pronunciation}</p>}
                               {word.example && <p className="text-sm text-gray-600 italic bg-gray-50 p-2 rounded">💬 {word.example}</p>}
                             </div>
-                            <button
-                              onClick={() => deleteWord(word.id)}
-                              className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition"
-                            >
-                              🗑️
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => copyWord(word)}
+                                className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition"
+                                title="복사"
+                              >
+                                📋
+                              </button>
+                              <button
+                                onClick={() => deleteWord(word.id)}
+                                className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition"
+                                title="삭제"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
