@@ -158,6 +158,15 @@
           });
 
           const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || `API 오류: ${response.status}`);
+          }
+
+          if (!data.choices || !data.choices[0]) {
+            throw new Error('API 응답 형식 오류');
+          }
+
           let responseText = data.choices[0].message.content;
           const translation = JSON.parse(responseText);
           
@@ -430,6 +439,15 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
           });
 
           const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || `API 오류: ${response.status}`);
+          }
+
+          if (!data.choices || !data.choices[0]) {
+            throw new Error('API 응답 형식 오류');
+          }
+
           let responseText = data.choices[0].message.content;
 
           const result = JSON.parse(responseText);

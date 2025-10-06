@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
 // OpenAI API 프록시 엔드포인트
 app.post('/api/openai', async (req, res) => {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
 
     if (!apiKey) {
       return res.status(500).json({
