@@ -8,8 +8,8 @@
 
 # 리다이렉트 설정
 [[redirects]]
-  from = "/api/openai"
-  to = "/.netlify/functions/openai"
+  from = "/api/gemini"
+  to = "/.netlify/functions/gemini"
   status = 200
 
 [[redirects]]

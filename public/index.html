@@ -54,11 +54,13 @@
         english: '',
         korean: '',
         pronunciation: '',
+        phonetic: '',
         example: '',
         difficulty: 'beginner'
       });
       const [isTranslating, setIsTranslating] = useState(false);
       const [translationMode, setTranslationMode] = useState('en-to-ko'); // 'en-to-ko' 또는 'ko-to-en'
+      const [includeExample, setIncludeExample] = useState(false); // 예문 포함 여부
 
       // 플래시카드
       const [currentCardIndex, setCurrentCardIndex] = useState(0);
@@ -108,13 +110,14 @@
           english: '',
           korean: '',
           pronunciation: '',
+          phonetic: '',
           example: '',
           difficulty: 'beginner'
         });
         setCurrentPage('list');
       };
 
-      // 번역 (양방향)
+      // 번역 (양방향) - Gemini API 사용
       const translateWord = async () => {
         const inputValue = translationMode === 'en-to-ko' ? newWord.english : newWord.korean;
 
@@ -125,35 +128,33 @@
 
         setIsTranslating(true);
         try {
+          const exampleInstruction = includeExample ? '"example": "간단한 영어 예문 1개",' : '';
+
           const prompt = translationMode === 'en-to-ko'
             ? `영단어 "${newWord.english}"에 대해 다음 정보를 JSON 형식으로 제공해주세요:
 {
   "korean": "한국어 뜻 (간단명료하게)",
   "pronunciation": "한글 발음",
-  "example": "간단한 영어 예문 1개"
+  "phonetic": "IPA 발음기호",
+  ${exampleInstruction}
 }
-반드시 JSON만 출력하세요.`
+반드시 JSON만 출력하세요. 다른 설명 없이 JSON만 출력하세요.`
             : `한국어 뜻 "${newWord.korean}"에 해당하는 영단어와 정보를 JSON 형식으로 제공해주세요:
 {
   "english": "가장 적합한 영단어 1개",
   "pronunciation": "한글 발음",
-  "example": "간단한 영어 예문 1개"
+  "phonetic": "IPA 발음기호",
+  ${exampleInstruction}
 }
-반드시 JSON만 출력하세요.`;
+반드시 JSON만 출력하세요. 다른 설명 없이 JSON만 출력하세요.`;
 
-          const response = await fetch("/api/openai", {
+          const response = await fetch("/.netlify/functions/gemini", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "gpt-4o",
-              max_tokens: 1000,
-              response_format: { type: "json_object" },
-              messages: [{
-                role: "user",
-                content: prompt
-              }]
+              prompt: prompt
             })
           });
 
@@ -163,11 +164,14 @@
             throw new Error(data.error || `API 오류: ${response.status}`);
           }
 
-          if (!data.choices || !data.choices[0]) {
+          if (!data.text) {
             throw new Error('API 응답 형식 오류');
           }
 
-          let responseText = data.choices[0].message.content;
+          let responseText = data.text.trim();
+          // JSON 추출 (마크다운 코드블록 제거)
+          responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
           const translation = JSON.parse(responseText);
           
           if (translationMode === 'en-to-ko') {
@@ -175,6 +179,7 @@
               ...newWord,
               korean: translation.korean || '',
               pronunciation: translation.pronunciation || '',
+              phonetic: translation.phonetic || '',
               example: translation.example || ''
             });
           } else {
@@ -182,6 +187,7 @@
               ...newWord,
               english: translation.english || '',
               pronunciation: translation.pronunciation || '',
+              phonetic: translation.phonetic || '',
               example: translation.example || ''
             });
           }
@@ -388,7 +394,7 @@
         };
       };
 
-      // AI 무제한 추천 (실시간 생성)
+      // AI 무제한 추천 (실시간 생성) - Gemini 사용, 3개로 축소
       const getRecommendations = async () => {
         setIsLoadingRecommendations(true);
         try {
@@ -402,18 +408,7 @@
           // 이미 등록된 단어 목록
           const registeredWords = words.map(w => w.english.toLowerCase());
 
-          const response = await fetch("/api/openai", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "gpt-4o",
-              max_tokens: 2000,
-              response_format: { type: "json_object" },
-              messages: [{
-                role: "user",
-                content: `사용자의 영단어 학습 분석:
+          const prompt = `사용자의 영단어 학습 분석:
 
 **현재 통계:**
 - 총 단어 수: ${stats.totalWords}개
@@ -427,7 +422,7 @@
 **이미 등록된 단어 (중복 제외):**
 ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' : ''}
 
-위 정보를 바탕으로 사용자에게 **실용적이고 중요한** 영단어 5개를 새롭게 생성하여 추천해주세요.
+위 정보를 바탕으로 사용자에게 **실용적이고 중요한** 영단어 3개를 새롭게 생성하여 추천해주세요.
 
 추천 기준:
 1. 위에 나열된 단어들과 **절대 중복되지 않는** 새로운 단어
@@ -443,16 +438,23 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
       "english": "단어1",
       "korean": "한글 뜻",
       "pronunciation": "한글 발음",
-      "example": "간단한 예문",
+      "phonetic": "IPA 발음기호",
       "difficulty": "beginner/intermediate/advanced"
     },
-    ... 5개
+    ... 3개
   ],
   "reason": "이 단어들을 추천하는 이유를 한 문장으로"
 }
 
-**중요: 반드시 JSON만 출력하세요. 다른 설명은 제외하세요.**`
-              }]
+**중요: 반드시 JSON만 출력하세요. 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.**`;
+
+          const response = await fetch("/.netlify/functions/gemini", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              prompt: prompt
             })
           });
 
@@ -462,11 +464,13 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
             throw new Error(data.error || `API 오류: ${response.status}`);
           }
 
-          if (!data.choices || !data.choices[0]) {
+          if (!data.text) {
             throw new Error('API 응답 형식 오류');
           }
 
-          let responseText = data.choices[0].message.content;
+          let responseText = data.text.trim();
+          // JSON 추출 (마크다운 코드블록 제거)
+          responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
           const result = JSON.parse(responseText);
           
@@ -662,7 +666,7 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                                 </span>
                               </div>
                               <p className="text-lg mb-1">🇰🇷 {word.korean}</p>
-                              {word.pronunciation && <p className="text-sm text-gray-500 mb-2">🔊 {word.pronunciation}</p>}
+                              {word.pronunciation && <p className="text-sm text-gray-500 mb-1">🔊 {word.pronunciation}{word.phonetic && <span className="ml-2 text-blue-600">{word.phonetic}</span>}</p>}
                               {word.example && <p className="text-sm text-gray-600 italic bg-gray-50 p-2 rounded">💬 {word.example}</p>}
                             </div>
                             <div className="flex gap-2">
@@ -697,7 +701,7 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                   {/* 번역 모드 선택 */}
                   <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border-2 border-blue-200">
                     <p className="text-sm font-semibold mb-3 text-gray-700">🔄 번역 방향 선택</p>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 mb-4">
                       <button
                         onClick={() => setTranslationMode('en-to-ko')}
                         className={`flex-1 py-3 rounded-lg font-semibold transition ${
@@ -719,6 +723,19 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                         🇰🇷 한글 → 영어
                       </button>
                     </div>
+
+                    {/* 예문 포함 옵션 */}
+                    <label className="flex items-center gap-2 cursor-pointer bg-white p-3 rounded-lg hover:bg-gray-50 transition">
+                      <input
+                        type="checkbox"
+                        checked={includeExample}
+                        onChange={(e) => setIncludeExample(e.target.checked)}
+                        className="w-5 h-5"
+                      />
+                      <span className="text-sm font-semibold text-gray-700">
+                        📝 예문 포함 (API 비용 증가)
+                      </span>
+                    </label>
                   </div>
 
                   <div className="space-y-4">
@@ -788,14 +805,27 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                       </>
                     )}
 
-                    <div>
-                      <label className="block text-sm font-semibold mb-2">한글 발음</label>
-                      <input
-                        type="text"
-                        value={newWord.pronunciation}
-                        onChange={(e) => setNewWord({...newWord, pronunciation: e.target.value})}
-                        className="w-full px-4 py-2 border rounded-lg"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">한글 발음</label>
+                        <input
+                          type="text"
+                          value={newWord.pronunciation}
+                          onChange={(e) => setNewWord({...newWord, pronunciation: e.target.value})}
+                          className="w-full px-4 py-2 border rounded-lg"
+                          placeholder="예: 이페머럴"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">발음기호 (IPA)</label>
+                        <input
+                          type="text"
+                          value={newWord.phonetic}
+                          onChange={(e) => setNewWord({...newWord, phonetic: e.target.value})}
+                          className="w-full px-4 py-2 border rounded-lg"
+                          placeholder="예: /ɪˈfɛmərəl/"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2">예문</label>
@@ -804,6 +834,7 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                         onChange={(e) => setNewWord({...newWord, example: e.target.value})}
                         className="w-full px-4 py-2 border rounded-lg"
                         rows="3"
+                        placeholder="예: The beauty of cherry blossoms is ephemeral."
                       />
                     </div>
                     <div>
@@ -1139,8 +1170,8 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                                 </span>
                               </div>
                               <p className="text-lg mb-2">🇰🇷 {word.korean}</p>
-                              <p className="text-sm text-gray-500 mb-2">🔊 {word.pronunciation}</p>
-                              <p className="text-sm text-gray-600 italic bg-gray-50 p-3 rounded mb-3">💬 {word.example}</p>
+                              <p className="text-sm text-gray-500 mb-2">🔊 {word.pronunciation}{word.phonetic && <span className="ml-2 text-blue-600">{word.phonetic}</span>}</p>
+                              {word.example && <p className="text-sm text-gray-600 italic bg-gray-50 p-3 rounded mb-3">💬 {word.example}</p>}
                               <button
                                 onClick={() => addRecommendedWord(word)}
                                 className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:from-pink-600 hover:to-purple-700 font-semibold"
