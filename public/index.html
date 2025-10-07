@@ -66,14 +66,16 @@
       const [newWord, setNewWord] = useState({
         english: '',
         korean: '',
+        vietnamese: '',
         pronunciation: '',
+        vietnamesePronunciation: '',
         phonetic: '',
         example: '',
         difficulty: 'beginner',
         tags: []
       });
       const [isTranslating, setIsTranslating] = useState(false);
-      const [translationMode, setTranslationMode] = useState('en-to-ko'); // 'en-to-ko' 또는 'ko-to-en'
+      const [translationMode, setTranslationMode] = useState('en-to-ko'); // 'en-to-ko', 'ko-to-en', 'en-to-vi', 'vi-to-en', 'ko-to-vi', 'vi-to-ko'
       const [includeExample, setIncludeExample] = useState(false); // 예문 포함 여부
 
       // 플래시카드
@@ -148,7 +150,9 @@
         setNewWord({
           english: '',
           korean: '',
+          vietnamese: '',
           pronunciation: '',
+          vietnamesePronunciation: '',
           phonetic: '',
           example: '',
           difficulty: 'beginner',
@@ -157,12 +161,20 @@
         setCurrentPage('list');
       };
 
-      // 번역 (양방향) - Gemini API 사용
+      // 번역 (다국어 지원) - Gemini API 사용
       const translateWord = async () => {
-        const inputValue = translationMode === 'en-to-ko' ? newWord.english : newWord.korean;
+        const modeConfig = {
+          'en-to-ko': { input: newWord.english, inputLang: '영어', outputLang: '한국어' },
+          'ko-to-en': { input: newWord.korean, inputLang: '한국어', outputLang: '영어' },
+          'en-to-vi': { input: newWord.english, inputLang: '영어', outputLang: '베트남어' },
+          'vi-to-en': { input: newWord.vietnamese, inputLang: '베트남어', outputLang: '영어' },
+          'ko-to-vi': { input: newWord.korean, inputLang: '한국어', outputLang: '베트남어' },
+          'vi-to-ko': { input: newWord.vietnamese, inputLang: '베트남어', outputLang: '한국어' }
+        };
 
-        if (!inputValue.trim()) {
-          alert(translationMode === 'en-to-ko' ? '영단어를 입력해주세요!' : '한글 뜻을 입력해주세요!');
+        const config = modeConfig[translationMode];
+        if (!config.input.trim()) {
+          alert(`${config.inputLang}를 입력해주세요!`);
           return;
         }
 
@@ -170,23 +182,59 @@
         try {
           const exampleInstruction = includeExample ? '"example": "간단한 영어 예문 1개",' : '';
 
-          const prompt = translationMode === 'en-to-ko'
-            ? `영단어 "${newWord.english}"에 대해 다음 정보를 JSON 형식으로 제공해주세요:
+          let prompt = '';
+          if (translationMode === 'en-to-ko') {
+            prompt = `영단어 "${newWord.english}"에 대해 다음 정보를 JSON 형식으로 제공해주세요:
 {
   "korean": "한국어 뜻 (간단명료하게)",
   "pronunciation": "한글 발음",
   "phonetic": "IPA 발음기호",
   ${exampleInstruction}
-}
-반드시 JSON만 출력하세요. 다른 설명 없이 JSON만 출력하세요.`
-            : `한국어 뜻 "${newWord.korean}"에 해당하는 영단어와 정보를 JSON 형식으로 제공해주세요:
+}`;
+          } else if (translationMode === 'ko-to-en') {
+            prompt = `한국어 "${newWord.korean}"에 해당하는 영단어와 정보를 JSON 형식으로 제공해주세요:
 {
   "english": "가장 적합한 영단어 1개",
   "pronunciation": "한글 발음",
   "phonetic": "IPA 발음기호",
   ${exampleInstruction}
-}
-반드시 JSON만 출력하세요. 다른 설명 없이 JSON만 출력하세요.`;
+}`;
+          } else if (translationMode === 'en-to-vi') {
+            prompt = `영단어 "${newWord.english}"에 대해 다음 정보를 JSON 형식으로 제공해주세요:
+{
+  "vietnamese": "베트남어 뜻",
+  "vietnamesePronunciation": "베트남어 발음 (한글로)",
+  "korean": "한국어 뜻 (참고용)",
+  "phonetic": "IPA 발음기호",
+  ${exampleInstruction}
+}`;
+          } else if (translationMode === 'vi-to-en') {
+            prompt = `베트남어 "${newWord.vietnamese}"에 해당하는 영단어와 정보를 JSON 형식으로 제공해주세요:
+{
+  "english": "가장 적합한 영단어 1개",
+  "korean": "한국어 뜻 (참고용)",
+  "phonetic": "IPA 발음기호",
+  ${exampleInstruction}
+}`;
+          } else if (translationMode === 'ko-to-vi') {
+            prompt = `한국어 "${newWord.korean}"에 해당하는 베트남어와 정보를 JSON 형식으로 제공해주세요:
+{
+  "vietnamese": "베트남어 단어",
+  "vietnamesePronunciation": "베트남어 발음 (한글로)",
+  "english": "영어 단어 (참고용)",
+  ${exampleInstruction}
+}`;
+          } else if (translationMode === 'vi-to-ko') {
+            prompt = `베트남어 "${newWord.vietnamese}"에 대해 다음 정보를 JSON 형식으로 제공해주세요:
+{
+  "korean": "한국어 뜻",
+  "vietnamese Pronunciation": "베트남어 발음 (한글로)",
+  "english": "영어 단어 (참고용)",
+  ${exampleInstruction}
+}`;
+          }
+
+          prompt += '\n반드시 JSON만 출력하세요. 다른 설명 없이 JSON만 출력하세요.';
 
           const response = await fetch("/.netlify/functions/gemini", {
             method: "POST",
@@ -213,24 +261,18 @@
           responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
           const translation = JSON.parse(responseText);
-          
-          if (translationMode === 'en-to-ko') {
-            setNewWord({
-              ...newWord,
-              korean: translation.korean || '',
-              pronunciation: translation.pronunciation || '',
-              phonetic: translation.phonetic || '',
-              example: translation.example || ''
-            });
-          } else {
-            setNewWord({
-              ...newWord,
-              english: translation.english || '',
-              pronunciation: translation.pronunciation || '',
-              phonetic: translation.phonetic || '',
-              example: translation.example || ''
-            });
-          }
+
+          // 번역 결과 적용
+          const updates = { ...newWord };
+          if (translation.english) updates.english = translation.english;
+          if (translation.korean) updates.korean = translation.korean;
+          if (translation.vietnamese) updates.vietnamese = translation.vietnamese;
+          if (translation.pronunciation) updates.pronunciation = translation.pronunciation;
+          if (translation.vietnamesePronunciation) updates.vietnamesePronunciation = translation.vietnamesePronunciation;
+          if (translation.phonetic) updates.phonetic = translation.phonetic;
+          if (translation.example) updates.example = translation.example;
+
+          setNewWord(updates);
         } catch (error) {
           console.error('번역 오류:', error);
           alert('번역 중 오류가 발생했습니다.');
@@ -786,7 +828,8 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                           if (searchQuery.trim()) {
                             const query = searchQuery.toLowerCase();
                             const matchesSearch = word.english.toLowerCase().includes(query) ||
-                                                 word.korean.toLowerCase().includes(query);
+                                                 word.korean.toLowerCase().includes(query) ||
+                                                 (word.vietnamese && word.vietnamese.toLowerCase().includes(query));
                             if (!matchesSearch) return false;
                           }
 
@@ -817,7 +860,9 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                                 ))}
                               </div>
                               <p className="text-lg mb-1">🇰🇷 {word.korean}</p>
+                              {word.vietnamese && <p className="text-lg mb-1">🇻🇳 {word.vietnamese}</p>}
                               {word.pronunciation && <p className="text-sm text-gray-500 mb-1">🔊 {word.pronunciation}{word.phonetic && <span className="ml-2 text-blue-600">{word.phonetic}</span>}</p>}
+                              {word.vietnamesePronunciation && <p className="text-sm text-gray-500 mb-1">🇻🇳🔊 {word.vietnamesePronunciation}</p>}
                               {word.example && <p className="text-sm text-gray-600 italic bg-gray-50 p-2 rounded">💬 {word.example}</p>}
                             </div>
                             <div className="flex gap-2">
@@ -859,10 +904,10 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                   {/* 번역 모드 선택 */}
                   <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border-2 border-blue-200">
                     <p className="text-sm font-semibold mb-3 text-gray-700">🔄 번역 방향 선택</p>
-                    <div className="flex gap-3 mb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
                       <button
                         onClick={() => setTranslationMode('en-to-ko')}
-                        className={`flex-1 py-3 rounded-lg font-semibold transition ${
+                        className={`py-2 px-3 rounded-lg font-semibold transition text-sm ${
                           translationMode === 'en-to-ko'
                             ? 'bg-blue-500 text-white'
                             : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -872,13 +917,53 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                       </button>
                       <button
                         onClick={() => setTranslationMode('ko-to-en')}
-                        className={`flex-1 py-3 rounded-lg font-semibold transition ${
+                        className={`py-2 px-3 rounded-lg font-semibold transition text-sm ${
                           translationMode === 'ko-to-en'
                             ? 'bg-blue-500 text-white'
                             : 'bg-white text-gray-700 hover:bg-gray-50'
                         }`}
                       >
                         🇰🇷 한글 → 영어
+                      </button>
+                      <button
+                        onClick={() => setTranslationMode('en-to-vi')}
+                        className={`py-2 px-3 rounded-lg font-semibold transition text-sm ${
+                          translationMode === 'en-to-vi'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        🇬🇧 영어 → 베트남어
+                      </button>
+                      <button
+                        onClick={() => setTranslationMode('vi-to-en')}
+                        className={`py-2 px-3 rounded-lg font-semibold transition text-sm ${
+                          translationMode === 'vi-to-en'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        🇻🇳 베트남어 → 영어
+                      </button>
+                      <button
+                        onClick={() => setTranslationMode('ko-to-vi')}
+                        className={`py-2 px-3 rounded-lg font-semibold transition text-sm ${
+                          translationMode === 'ko-to-vi'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        🇰🇷 한글 → 베트남어
+                      </button>
+                      <button
+                        onClick={() => setTranslationMode('vi-to-ko')}
+                        className={`py-2 px-3 rounded-lg font-semibold transition text-sm ${
+                          translationMode === 'vi-to-ko'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        🇻🇳 베트남어 → 한글
                       </button>
                     </div>
 
@@ -897,94 +982,127 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                   </div>
 
                   <div className="space-y-4">
-                    {translationMode === 'en-to-ko' ? (
-                      <>
-                        {/* 영어 → 한글 모드 */}
-                        <div>
-                          <label className="block text-sm font-semibold mb-2">영단어 *</label>
-                          <div className="flex gap-2">
+                    {/* 번역 입력 필드 */}
+                    {(() => {
+                      const modeFields = {
+                        'en-to-ko': [
+                          { label: '영단어 *', field: 'english', placeholder: '예: hello', withButton: true },
+                          { label: '한국어 뜻 *', field: 'korean', placeholder: '자동 번역됩니다' }
+                        ],
+                        'ko-to-en': [
+                          { label: '한국어 뜻 *', field: 'korean', placeholder: '예: 안녕', withButton: true },
+                          { label: '영단어 *', field: 'english', placeholder: '자동 번역됩니다' }
+                        ],
+                        'en-to-vi': [
+                          { label: '영단어 *', field: 'english', placeholder: '예: hello', withButton: true },
+                          { label: '베트남어 *', field: 'vietnamese', placeholder: '자동 번역됩니다' }
+                        ],
+                        'vi-to-en': [
+                          { label: '베트남어 *', field: 'vietnamese', placeholder: '예: xin chào', withButton: true },
+                          { label: '영단어 *', field: 'english', placeholder: '자동 번역됩니다' }
+                        ],
+                        'ko-to-vi': [
+                          { label: '한국어 뜻 *', field: 'korean', placeholder: '예: 안녕', withButton: true },
+                          { label: '베트남어 *', field: 'vietnamese', placeholder: '자동 번역됩니다' }
+                        ],
+                        'vi-to-ko': [
+                          { label: '베트남어 *', field: 'vietnamese', placeholder: '예: xin chào', withButton: true },
+                          { label: '한국어 뜻 *', field: 'korean', placeholder: '자동 번역됩니다' }
+                        ]
+                      };
+
+                      return modeFields[translationMode].map((fieldConfig, idx) => (
+                        <div key={idx}>
+                          <label className="block text-sm font-semibold mb-2">{fieldConfig.label}</label>
+                          <div className={fieldConfig.withButton ? "flex gap-2" : ""}>
                             <input
                               type="text"
-                              value={newWord.english}
-                              onChange={(e) => setNewWord({...newWord, english: e.target.value})}
-                              onKeyPress={(e) => e.key === 'Enter' && !isTranslating && newWord.english.trim() && translateWord()}
-                              className="flex-1 px-4 py-2 border rounded-lg"
-                              placeholder="예: ephemeral"
+                              value={newWord[fieldConfig.field]}
+                              onChange={(e) => setNewWord({...newWord, [fieldConfig.field]: e.target.value})}
+                              onKeyPress={(e) => fieldConfig.withButton && e.key === 'Enter' && !isTranslating && newWord[fieldConfig.field].trim() && translateWord()}
+                              className={`${fieldConfig.withButton ? 'flex-1' : 'w-full'} px-4 py-2 border rounded-lg`}
+                              placeholder={fieldConfig.placeholder}
                             />
-                            <button
-                              onClick={translateWord}
-                              disabled={isTranslating}
-                              className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition disabled:bg-gray-300"
-                            >
-                              {isTranslating ? '번역중...' : '🌐 번역'}
-                            </button>
+                            {fieldConfig.withButton && (
+                              <button
+                                onClick={translateWord}
+                                disabled={isTranslating}
+                                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition disabled:bg-gray-300"
+                              >
+                                {isTranslating ? '번역중...' : '🌐 번역'}
+                              </button>
+                            )}
                           </div>
                         </div>
+                      ));
+                    })()}
+
+                    {/* 모든 언어 필드 (선택사항) */}
+                    <div className="border-t pt-4">
+                      <p className="text-sm font-semibold text-gray-600 mb-3">📝 추가 정보 (선택사항)</p>
+                      <div className="grid grid-cols-3 gap-4 mb-4">
                         <div>
-                          <label className="block text-sm font-semibold mb-2">한국어 뜻 *</label>
-                          <input
-                            type="text"
-                            value={newWord.korean}
-                            onChange={(e) => setNewWord({...newWord, korean: e.target.value})}
-                            className="w-full px-4 py-2 border rounded-lg"
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* 한글 → 영어 모드 */}
-                        <div>
-                          <label className="block text-sm font-semibold mb-2">한국어 뜻 *</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={newWord.korean}
-                              onChange={(e) => setNewWord({...newWord, korean: e.target.value})}
-                              onKeyPress={(e) => e.key === 'Enter' && !isTranslating && newWord.korean.trim() && translateWord()}
-                              className="flex-1 px-4 py-2 border rounded-lg"
-                              placeholder="예: 일시적인, 덧없는"
-                            />
-                            <button
-                              onClick={translateWord}
-                              disabled={isTranslating}
-                              className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition disabled:bg-gray-300"
-                            >
-                              {isTranslating ? '번역중...' : '🌐 번역'}
-                            </button>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold mb-2">영단어 *</label>
+                          <label className="block text-xs font-semibold mb-2 text-gray-600">🇬🇧 영어</label>
                           <input
                             type="text"
                             value={newWord.english}
                             onChange={(e) => setNewWord({...newWord, english: e.target.value})}
-                            className="w-full px-4 py-2 border rounded-lg"
+                            className="w-full px-3 py-2 border rounded text-sm"
+                            placeholder="English"
                           />
                         </div>
-                      </>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold mb-2">한글 발음</label>
-                        <input
-                          type="text"
-                          value={newWord.pronunciation}
-                          onChange={(e) => setNewWord({...newWord, pronunciation: e.target.value})}
-                          className="w-full px-4 py-2 border rounded-lg"
-                          placeholder="예: 이페머럴"
-                        />
+                        <div>
+                          <label className="block text-xs font-semibold mb-2 text-gray-600">🇰🇷 한국어</label>
+                          <input
+                            type="text"
+                            value={newWord.korean}
+                            onChange={(e) => setNewWord({...newWord, korean: e.target.value})}
+                            className="w-full px-3 py-2 border rounded text-sm"
+                            placeholder="한국어"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-2 text-gray-600">🇻🇳 베트남어</label>
+                          <input
+                            type="text"
+                            value={newWord.vietnamese}
+                            onChange={(e) => setNewWord({...newWord, vietnamese: e.target.value})}
+                            className="w-full px-3 py-2 border rounded text-sm"
+                            placeholder="Tiếng Việt"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-semibold mb-2">발음기호 (IPA)</label>
-                        <input
-                          type="text"
-                          value={newWord.phonetic}
-                          onChange={(e) => setNewWord({...newWord, phonetic: e.target.value})}
-                          className="w-full px-4 py-2 border rounded-lg"
-                          placeholder="예: /ɪˈfɛmərəl/"
-                        />
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold mb-2 text-gray-600">한글 발음</label>
+                          <input
+                            type="text"
+                            value={newWord.pronunciation}
+                            onChange={(e) => setNewWord({...newWord, pronunciation: e.target.value})}
+                            className="w-full px-3 py-2 border rounded text-sm"
+                            placeholder="예: 헬로우"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-2 text-gray-600">베트남어 발음</label>
+                          <input
+                            type="text"
+                            value={newWord.vietnamesePronunciation}
+                            onChange={(e) => setNewWord({...newWord, vietnamesePronunciation: e.target.value})}
+                            className="w-full px-3 py-2 border rounded text-sm"
+                            placeholder="예: 신짜오"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold mb-2 text-gray-600">발음기호 (IPA)</label>
+                          <input
+                            type="text"
+                            value={newWord.phonetic}
+                            onChange={(e) => setNewWord({...newWord, phonetic: e.target.value})}
+                            className="w-full px-3 py-2 border rounded text-sm"
+                            placeholder="/həˈloʊ/"
+                          />
+                        </div>
                       </div>
                     </div>
                     <div>
