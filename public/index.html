@@ -539,57 +539,44 @@
             'academic': `학술/대학 수준의 고급 어휘`
           };
 
-          const prompt = `사용자의 영단어 학습 분석:
+          // 등록된 단어 목록을 안전하게 처리
+          const wordList = registeredWords.slice(0, 100).join(', ').replace(/"/g, '\\"');
+          const wordCount = registeredWords.length > 100 ? `외 ${registeredWords.length - 100}개 더 있음` : '';
 
-**현재 통계:**
+          const prompt = `영단어 학습 앱 사용자에게 맞춤형 단어를 추천해주세요.
+
+현재 통계:
 - 총 단어 수: ${stats.totalWords}개
 - 전체 정답률: ${stats.accuracy}%
 - 오늘 학습: ${stats.todayCount}개
-- 난이도별 현황:
-  • 초급: ${stats.byDifficulty.beginner}개
-  • 중급: ${stats.byDifficulty.intermediate}개
-  • 고급: ${stats.byDifficulty.advanced}개
+- 난이도별: 초급 ${stats.byDifficulty.beginner}개, 중급 ${stats.byDifficulty.intermediate}개, 고급 ${stats.byDifficulty.advanced}개
 - 부족한 난이도: ${weakDifficulties.join(', ') || '균형 잡힘'}
-
-**학습 패턴:**
 - 선호 언어: ${languagePreference}
-- 자주 틀린 단어: ${wrongWords.length > 0 ? wrongWords.join(', ') : '없음'}
-- 요청 카테고리: ${categoryPrompts[category]}
+- 카테고리: ${categoryPrompts[category]}
 
-**이미 등록된 단어 (중복 제외):**
-${registeredWords.slice(0, 100).join(', ')}${registeredWords.length > 100 ? '... 외 ' + (registeredWords.length - 100) + '개' : ''}
+이미 등록된 단어 (중복 제외): ${wordList} ${wordCount}
 
-위 정보를 바탕으로 사용자에게 **실용적이고 중요한** 영단어 5개를 추천해주세요.
+위 정보를 바탕으로 완전히 새로운 영단어 5개를 추천하고, 다음 JSON 형식으로만 응답하세요:
 
-추천 기준:
-1. 위에 나열된 단어들과 **절대 중복되지 않는** 완전히 새로운 단어
-2. ${category === 'auto' ? '사용자의 취약점(자주 틀린 단어 유형, 부족한 난이도)을 보완' : categoryPrompts[category]}
-3. ${category === 'auto' ? '실용성과 시험 빈출도를 모두 고려' : '해당 카테고리의 핵심 필수 단어'}
-4. 난이도 다양성 확보 (너무 쉽거나 어려운 것만 피하기)
-5. 최신 트렌드 반영 (비즈니스, 기술 용어 등)
-
-다음 JSON 형식으로 반환:
 {
   "recommendations": [
     {
-      "english": "단어1",
+      "english": "단어",
       "korean": "한글 뜻",
       "vietnamese": "베트남어 뜻",
       "pronunciation": "한글 발음",
-      "vietnamesePronunciation": "베트남어 발음 (한글로)",
-      "phonetic": "IPA 발음기호",
-      "difficulty": "beginner/intermediate/advanced",
-      "tags": ["적절한 태그1", "적절한 태그2"],
-      "example": "예문 (선택사항)"
-    },
-    ... 5개
+      "vietnamesePronunciation": "베트남어 발음",
+      "phonetic": "IPA 기호",
+      "difficulty": "beginner or intermediate or advanced",
+      "tags": ["태그1", "태그2"],
+      "example": "영어 예문"
+    }
   ],
-  "reason": "이 단어들을 추천하는 구체적인 이유 (사용자 학습 패턴 기반)"
+  "reason": "추천 이유"
 }
 
-**태그는 다음 중에서 선택:** 비즈니스, 여행, 시험, 일상, 기술, 학술, 기타
-
-**중요: 반드시 JSON만 출력하세요. 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.**`;
+태그 옵션: 비즈니스, 여행, 시험, 일상, 기술, 학술, 기타
+중요: 순수 JSON만 출력하세요. 마크다운 코드블록 없이.`;
 
           const response = await fetch("/.netlify/functions/gemini", {
             method: "POST",
