@@ -62,15 +62,23 @@ exports.handler = async (event, context) => {
       })
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    console.log('Gemini API Status:', response.status);
+    console.log('Gemini API Response:', responseText.substring(0, 500));
 
     if (!response.ok) {
       return {
         statusCode: response.status,
         headers,
-        body: JSON.stringify(data)
+        body: JSON.stringify({
+          error: 'Gemini API 오류',
+          status: response.status,
+          details: responseText.substring(0, 200)
+        })
       };
     }
+
+    const data = JSON.parse(responseText);
 
     // Gemini 응답 파싱
     if (data.candidates && data.candidates[0] && data.candidates[0].content) {
@@ -84,18 +92,25 @@ exports.handler = async (event, context) => {
         })
       };
     } else {
+      console.error('Gemini 응답 형식 오류:', data);
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ error: 'Gemini API 응답 형식 오류' })
+        body: JSON.stringify({
+          error: 'Gemini API 응답 형식 오류',
+          response: data
+        })
       };
     }
   } catch (error) {
-    console.error('API 오류:', error);
+    console.error('API 오류 상세:', error);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: '서버 오류가 발생했습니다.' })
+      body: JSON.stringify({
+        error: '서버 오류가 발생했습니다.',
+        details: error.message
+      })
     };
   }
 };

@@ -10,7 +10,8 @@
       "Bash(mkdir:*)",
       "Bash(git push:*)",
       "Bash(npx netlify:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []
