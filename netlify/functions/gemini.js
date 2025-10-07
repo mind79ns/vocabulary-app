@@ -56,8 +56,9 @@ exports.handler = async (event, context) => {
           }]
         }],
         generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2000,
+          temperature: 0.3,
+          maxOutputTokens: 3000,
+          responseMimeType: "application/json"
         }
       })
     });

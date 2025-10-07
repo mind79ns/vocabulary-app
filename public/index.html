@@ -539,44 +539,45 @@
             'academic': `학술/대학 수준의 고급 어휘`
           };
 
-          // 등록된 단어 목록을 안전하게 처리
-          const wordList = registeredWords.slice(0, 100).join(', ').replace(/"/g, '\\"');
-          const wordCount = registeredWords.length > 100 ? `외 ${registeredWords.length - 100}개 더 있음` : '';
+          // 카테고리에 따른 간단한 설명
+          const categoryDesc = {
+            'auto': '사용자 맞춤 추천',
+            'toeic': 'TOEIC 빈출 단어',
+            'business': '비즈니스 실무 단어',
+            'daily': '일상 기본 단어',
+            'travel': '여행 필수 단어',
+            'academic': '학술 고급 단어'
+          };
 
-          const prompt = `영단어 학습 앱 사용자에게 맞춤형 단어를 추천해주세요.
+          const prompt = `You are a vocabulary learning assistant. Generate 5 English words for category: ${categoryDesc[category]}.
 
-현재 통계:
-- 총 단어 수: ${stats.totalWords}개
-- 전체 정답률: ${stats.accuracy}%
-- 오늘 학습: ${stats.todayCount}개
-- 난이도별: 초급 ${stats.byDifficulty.beginner}개, 중급 ${stats.byDifficulty.intermediate}개, 고급 ${stats.byDifficulty.advanced}개
-- 부족한 난이도: ${weakDifficulties.join(', ') || '균형 잡힘'}
-- 선호 언어: ${languagePreference}
-- 카테고리: ${categoryPrompts[category]}
+User stats:
+- Total words: ${stats.totalWords}
+- Weak difficulty: ${weakDifficulties.join(', ') || 'balanced'}
+- Category: ${categoryDesc[category]}
 
-이미 등록된 단어 (중복 제외): ${wordList} ${wordCount}
+Registered words to avoid: ${registeredWords.slice(0, 50).join(', ')}
 
-위 정보를 바탕으로 완전히 새로운 영단어 5개를 추천하고, 다음 JSON 형식으로만 응답하세요:
-
+Return ONLY valid JSON (no markdown, no comments):
 {
   "recommendations": [
     {
-      "english": "단어",
-      "korean": "한글 뜻",
-      "vietnamese": "베트남어 뜻",
-      "pronunciation": "한글 발음",
-      "vietnamesePronunciation": "베트남어 발음",
-      "phonetic": "IPA 기호",
-      "difficulty": "beginner or intermediate or advanced",
-      "tags": ["태그1", "태그2"],
-      "example": "영어 예문"
+      "english": "word",
+      "korean": "뜻",
+      "vietnamese": "nghĩa",
+      "pronunciation": "발음",
+      "vietnamesePronunciation": "phát âm",
+      "phonetic": "/IPA/",
+      "difficulty": "beginner",
+      "tags": ["tag1", "tag2"],
+      "example": "Example sentence."
     }
   ],
-  "reason": "추천 이유"
+  "reason": "Brief reason for recommendation"
 }
 
-태그 옵션: 비즈니스, 여행, 시험, 일상, 기술, 학술, 기타
-중요: 순수 JSON만 출력하세요. 마크다운 코드블록 없이.`;
+Tags: 비즈니스, 여행, 시험, 일상, 기술, 학술, 기타
+IMPORTANT: Return pure JSON only. No code blocks, no explanations.`;
 
           const response = await fetch("/.netlify/functions/gemini", {
             method: "POST",
@@ -599,8 +600,26 @@
           }
 
           let responseText = data.text.trim();
-          // JSON 추출 (마크다운 코드블록 제거)
-          responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+          // 강력한 JSON 추출
+          // 1. 마크다운 코드블록 제거
+          responseText = responseText.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+
+          // 2. JSON 객체만 추출 (첫 { 부터 마지막 } 까지)
+          const firstBrace = responseText.indexOf('{');
+          const lastBrace = responseText.lastIndexOf('}');
+
+          if (firstBrace === -1 || lastBrace === -1) {
+            throw new Error('JSON 형식을 찾을 수 없습니다.');
+          }
+
+          responseText = responseText.substring(firstBrace, lastBrace + 1);
+
+          // 3. 주석 제거 (// 또는 /* */ 형식)
+          responseText = responseText.replace(/\/\/.*$/gm, '');
+          responseText = responseText.replace(/\/\*[\s\S]*?\*\//g, '');
+
+          console.log('정제된 JSON:', responseText);
 
           const result = JSON.parse(responseText);
           
