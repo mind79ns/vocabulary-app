@@ -56,7 +56,8 @@
         pronunciation: '',
         phonetic: '',
         example: '',
-        difficulty: 'beginner'
+        difficulty: 'beginner',
+        tags: []
       });
       const [isTranslating, setIsTranslating] = useState(false);
       const [translationMode, setTranslationMode] = useState('en-to-ko'); // 'en-to-ko' 또는 'ko-to-en'
@@ -80,6 +81,11 @@
 
       // 검색
       const [searchQuery, setSearchQuery] = useState('');
+
+      // 태그 관리
+      const defaultTags = ['비즈니스', '여행', '시험', '일상', '기타'];
+      const [availableTags, setAvailableTags] = useState(defaultTags);
+      const [selectedTagFilter, setSelectedTagFilter] = useState('전체');
 
       // LocalStorage 자동 저장
       useEffect(() => {
@@ -115,7 +121,8 @@
           pronunciation: '',
           phonetic: '',
           example: '',
-          difficulty: 'beginner'
+          difficulty: 'beginner',
+          tags: []
         });
         setCurrentPage('list');
       };
@@ -442,12 +449,15 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
       "korean": "한글 뜻",
       "pronunciation": "한글 발음",
       "phonetic": "IPA 발음기호",
-      "difficulty": "beginner/intermediate/advanced"
+      "difficulty": "beginner/intermediate/advanced",
+      "tags": ["적절한 태그1", "적절한 태그2"]
     },
     ... 3개
   ],
   "reason": "이 단어들을 추천하는 이유를 한 문장으로"
 }
+
+**태그는 다음 중에서 선택:** 비즈니스, 여행, 시험, 일상, 기타
 
 **중요: 반드시 JSON만 출력하세요. 다른 설명이나 마크다운 없이 순수 JSON만 출력하세요.**`;
 
@@ -661,6 +671,39 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                       />
                     )}
                   </div>
+
+                  {/* 태그 필터 */}
+                  {words.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-700">🏷️ 태그:</span>
+                        <button
+                          onClick={() => setSelectedTagFilter('전체')}
+                          className={`px-3 py-1 rounded-lg text-sm font-semibold transition ${
+                            selectedTagFilter === '전체'
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          전체
+                        </button>
+                        {availableTags.map(tag => (
+                          <button
+                            key={tag}
+                            onClick={() => setSelectedTagFilter(tag)}
+                            className={`px-3 py-1 rounded-lg text-sm font-semibold transition ${
+                              selectedTagFilter === tag
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {words.length === 0 ? (
                     <div className="text-center py-12 text-gray-400">
                       <p className="text-6xl mb-4">📖</p>
@@ -671,22 +714,36 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                     <div className="space-y-4">
                       {words
                         .filter(word => {
-                          if (!searchQuery.trim()) return true;
-                          const query = searchQuery.toLowerCase();
-                          return (
-                            word.english.toLowerCase().includes(query) ||
-                            word.korean.toLowerCase().includes(query)
-                          );
+                          // 검색 필터
+                          if (searchQuery.trim()) {
+                            const query = searchQuery.toLowerCase();
+                            const matchesSearch = word.english.toLowerCase().includes(query) ||
+                                                 word.korean.toLowerCase().includes(query);
+                            if (!matchesSearch) return false;
+                          }
+
+                          // 태그 필터
+                          if (selectedTagFilter !== '전체') {
+                            const wordTags = word.tags || [];
+                            if (!wordTags.includes(selectedTagFilter)) return false;
+                          }
+
+                          return true;
                         })
                         .map(word => (
                         <div key={word.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
                                 <h3 className="text-xl font-bold">{word.english}</h3>
                                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getDifficultyColor(word.difficulty)}`}>
                                   {getDifficultyText(word.difficulty)}
                                 </span>
+                                {word.tags && word.tags.length > 0 && word.tags.map(tag => (
+                                  <span key={tag} className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
+                                    🏷️ {tag}
+                                  </span>
+                                ))}
                               </div>
                               <p className="text-lg mb-1">🇰🇷 {word.korean}</p>
                               {word.pronunciation && <p className="text-sm text-gray-500 mb-1">🔊 {word.pronunciation}{word.phonetic && <span className="ml-2 text-blue-600">{word.phonetic}</span>}</p>}
@@ -873,6 +930,30 @@ ${registeredWords.slice(0, 50).join(', ')}${registeredWords.length > 50 ? '...' 
                         <option value="intermediate">중급</option>
                         <option value="advanced">고급</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">🏷️ 태그 (복수 선택 가능)</label>
+                      <div className="flex flex-wrap gap-2">
+                        {availableTags.map(tag => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              const newTags = newWord.tags.includes(tag)
+                                ? newWord.tags.filter(t => t !== tag)
+                                : [...newWord.tags, tag];
+                              setNewWord({...newWord, tags: newTags});
+                            }}
+                            className={`px-4 py-2 rounded-lg font-semibold transition ${
+                              newWord.tags.includes(tag)
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div className="flex gap-3 pt-4">
                       <button
