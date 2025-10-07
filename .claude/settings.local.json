@@ -8,7 +8,9 @@
       "Bash(git commit:*)",
       "Bash(git config:*)",
       "Bash(mkdir:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npx netlify:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
